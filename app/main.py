@@ -45,12 +45,62 @@ def init_db():
 def search_pages(query):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT page_name, title, snippet
-        FROM pages
-        WHERE search_vector @@ plainto_tsquery('russian', %s)
-        ORDER BY ts_rank(search_vector, plainto_tsquery('russian', %s)) DESC;
-    """, (query, query))
+    
+    # Parse Google Dorks operators
+    if ':' in query:
+        if query.startswith('inurl:'):
+            # Search in page_name field
+            search_term = query[6:]  # Remove 'inurl:' prefix
+            cursor.execute("""
+                SELECT page_name, title, snippet
+                FROM pages
+                WHERE page_name ILIKE %s
+                ORDER BY page_name;
+            """, (f'%{search_term}%',))
+        elif query.startswith('intitle:'):
+            # Search in title field
+            search_term = query[8:]  # Remove 'intitle:' prefix
+            cursor.execute("""
+                SELECT page_name, title, snippet
+                FROM pages
+                WHERE title ILIKE %s
+                ORDER BY title;
+            """, (f'%{search_term}%',))
+        elif query.startswith('intext:'):
+            # Search in content field
+            search_term = query[7:]  # Remove 'intext:' prefix
+            cursor.execute("""
+                SELECT page_name, title, snippet
+                FROM pages
+                WHERE content ILIKE %s
+                ORDER BY title;
+            """, (f'%{search_term}%',))
+        elif query.startswith('filetype:'):
+            # Search by file extension in page_name
+            file_type = query[9:]  # Remove 'filetype:' prefix
+            cursor.execute("""
+                SELECT page_name, title, snippet
+                FROM pages
+                WHERE page_name ILIKE %s
+                ORDER BY page_name;
+            """, (f'%.{file_type}%',))
+        else:
+            # Default search using full-text search
+            cursor.execute("""
+                SELECT page_name, title, snippet
+                FROM pages
+                WHERE search_vector @@ plainto_tsquery('russian', %s)
+                ORDER BY ts_rank(search_vector, plainto_tsquery('russian', %s)) DESC;
+            """, (query, query))
+    else:
+        # Default search using full-text search
+        cursor.execute("""
+            SELECT page_name, title, snippet
+            FROM pages
+            WHERE search_vector @@ plainto_tsquery('russian', %s)
+            ORDER BY ts_rank(search_vector, plainto_tsquery('russian', %s)) DESC;
+        """, (query, query))
+    
     results = cursor.fetchall()
     conn.close()
     return results

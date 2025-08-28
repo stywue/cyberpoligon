@@ -195,6 +195,38 @@ body, html {
     background-color: #e6c94d;
 }
 
+/* Search hints */
+.search-hints {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.search-hints p {
+    margin-top: 0;
+    font-weight: bold;
+    color: #495057;
+}
+
+.search-hints ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+.search-hints li {
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.search-hints code {
+    background-color: #e9ecef;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
 /* Bottom bar */
 .bottom-bar {
     max-width: 900px;
@@ -217,13 +249,49 @@ body, html {
 .advertisement-banner {
     max-width: 900px;
     margin: 0 auto 40px auto;
-    padding: 10px 20px;
-    background-color: #f4c7b8;
-    border-radius: 8px;
+    padding: 15px 25px;
+    background-color: #ffeb3b; /* Bright background */
+    border-radius: 10px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
     font-family: Arial, sans-serif;
+    transition: transform 0.3s ease; /* Add transition */
+}
+
+.advertisement-banner:hover {
+    transform: scale(1.02); /* Scale effect on hover */
+}
+
+.ad-text {
+    flex: 1;
+    color: #d32f2f; /* Darker text color */
+    font-size: 20px; /* Increased font size */
+    font-weight: bold;
+}
+
+.ad-text a {
+    color: #d32f2f; /* Darker link color */
+    text-decoration: none;
+    font-size: 16px; /* Increased link font size */
+}
+
+.ad-text a:hover {
+    text-decoration: underline;
+    color: #c2185b; /* Change color on hover */
+}
+
+.ad-highlight {
+    width: 140px; /* Increased width */
+    height: 70px; /* Increased height */
+    background-color: #388e3c; /* Green background */
+    border-radius: 10px;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 16px; /* Increased font size */
 }
 
 .ad-text {
