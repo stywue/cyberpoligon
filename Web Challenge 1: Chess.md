@@ -1,4 +1,4 @@
-# Web Challenge 1: Chess — простой пошаговый райтап
+# Web Challenge 1: Chess 
 
 ## Что было в задании
 Нужно «обыграть Stockfish» через WebSocket-сервер с шахматами.
@@ -50,6 +50,25 @@ python3 solve.py --burst e2e4 d1h5 f1c4 h5f7
 2. Отклонять любой ход «не своей очереди».
 3. Обрабатывать следующий ход только после полного завершения предыдущего.
 4. Добавить rate limit на клиента.
+
+
+## Необходимые команды 
+
+```bash
+# 1) Подготовка
+python3 -m venv .venv
+source .venv/bin/activate
+pip install websockets
+
+# 2) Достать solver из архива (если файла нет в репозитории)
+unzip -o web.zip web/chall1/solve.py -d .
+
+# 3) Запуск атаки burst (мат в 4 хода)
+python3 web/chall1/solve.py --burst e2e4 d1h5 f1c4 h5f7
+
+# 4) (опционально) Явно указать URL инстанса
+python3 web/chall1/solve.py ws://51.250.116.20:4832/ws --burst e2e4 d1h5 f1c4 h5f7
+```
 
 ## Итог
 Задание было не про шахматы, а про race condition/десинхронизацию по WebSocket. Достаточно было быстро отправить выигрышную последовательность ходов в `--burst`.
